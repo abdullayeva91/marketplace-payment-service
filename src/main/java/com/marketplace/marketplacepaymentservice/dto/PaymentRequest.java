@@ -9,4 +9,5 @@ public class PaymentRequest {
     private Long orderId;
     private BigDecimal amount;
     private String cardNumber;
+    private String userEmail;
 }

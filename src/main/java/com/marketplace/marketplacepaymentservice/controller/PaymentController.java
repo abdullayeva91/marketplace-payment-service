@@ -2,9 +2,8 @@ package com.marketplace.marketplacepaymentservice.controller;
 
 import com.marketplace.marketplacepaymentservice.dto.PaymentRequest;
 import com.marketplace.marketplacepaymentservice.model.Payment;
-import com.marketplace.marketplacepaymentservice.repository.PaymentRepository;
 import com.marketplace.marketplacepaymentservice.service.PaymentService;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,20 +20,27 @@ public class PaymentController {
     }
 
     @PostMapping("/process")
-    public ResponseEntity<Payment> processPayment(@RequestBody PaymentRequest request) {
-        // Bu metod çağırıldıqda PaymentService daxilində həm bazaya yazılacaq,
-        // həm də statusa uyğun olaraq Notification göndəriləcək.
+    public ResponseEntity<Payment> processPayment(
+            @RequestHeader(value = "X-Auth-User-Id", required = false) String userIdHeader,
+            @RequestBody PaymentRequest request) {
+
+        if (userIdHeader == null || userIdHeader.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
         Payment payment = paymentService.paymentProcesses(request);
         return ResponseEntity.ok(payment);
     }
 
     @GetMapping
-    public ResponseEntity<List<Payment>> getAllPayments() {
-        return ResponseEntity.ok(paymentService.getAllPayments());
-    }
+    public ResponseEntity<List<Payment>> getAllPayments(
+            @RequestHeader(value = "X-Auth-User-Role", required = false) String role) {
 
-    @GetMapping("/{orderId}")
-    public ResponseEntity<Payment> getPaymentByOrderId(@PathVariable Long orderId) {
-        return ResponseEntity.ok(paymentService.getPaymentByOrderId(orderId));
+
+        if (!"ADMIN".equals(role)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        return ResponseEntity.ok(paymentService.getAllPayments());
     }
 }

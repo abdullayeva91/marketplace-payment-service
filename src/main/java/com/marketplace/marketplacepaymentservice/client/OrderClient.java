@@ -1,13 +1,14 @@
 package com.marketplace.marketplacepaymentservice.client;
 
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
-@FeignClient(name = "order-service", url = "http://localhost:8084/api/orders")
+@FeignClient(name = "order-service", url = "http://localhost:8084")
 public interface OrderClient {
-    @PostMapping("/{id}/status")
-    void updateOrderStatus(@PathVariable("id") Long id, @RequestParam("status") String status);
+    @PostMapping("/api/orders/{id}/update-status")
+    void updateOrderStatus(
+            @PathVariable("id") Long id,
+            @RequestParam("status") String status,
+            @RequestHeader("X-Auth-User-Role") String role
+    );
 }

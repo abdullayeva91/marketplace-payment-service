@@ -7,7 +7,7 @@ import com.marketplace.marketplacepaymentservice.dto.PaymentRequest;
 import com.marketplace.marketplacepaymentservice.enums.PaymentStatus;
 import com.marketplace.marketplacepaymentservice.model.Payment;
 import com.marketplace.marketplacepaymentservice.repository.PaymentRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -15,12 +15,12 @@ import java.util.UUID;
 
 @Service
 public class PaymentService {
-    @Autowired
-    private PaymentRepository paymentRepository;
+    private final PaymentRepository paymentRepository;
     private final OrderClient orderClient;
     private final NotificationClient notificationClient;
 
-    public PaymentService(OrderClient orderClient, NotificationClient notificationClient) {
+    public PaymentService(PaymentRepository paymentRepository, OrderClient orderClient, NotificationClient notificationClient) {
+        this.paymentRepository = paymentRepository;
         this.orderClient = orderClient;
         this.notificationClient = notificationClient;
     }
@@ -29,6 +29,7 @@ public class PaymentService {
         Payment payment = new Payment();
         payment.setOrderId(request.getOrderId());
         payment.setAmount(request.getAmount());
+        payment.setUserEmail(request.getUserEmail());
 
         if (request.getCardNumber().startsWith("123")) {
             payment.setStatus(PaymentStatus.SUCCESS);
@@ -39,31 +40,40 @@ public class PaymentService {
 
         Payment savedPayment = paymentRepository.save(payment);
 
+        if (savedPayment.getStatus() == PaymentStatus.SUCCESS) {
 
-        try {
-            NotificationRequest notification = new NotificationRequest();
-            notification.setTo("l.s2015@mail.ru");
+            updateOrderAfterPayment(savedPayment.getOrderId(), "PAID");
 
-            if (savedPayment.getStatus() == PaymentStatus.SUCCESS) {
-                notification.setSubject("Ödəniş Uğurludur! #" + savedPayment.getOrderId());
-                notification.setMessage("Hörmətli müştəri, " + savedPayment.getAmount() + " AZN ödənişiniz uğurla tamamlandı. Transaction ID: " + savedPayment.getTransactionId());
-            } else {
-                notification.setSubject("Ödəniş Uğursuz Oldu! #" + savedPayment.getOrderId());
-                notification.setMessage("Təəssüf ki, ödəniş tamamlanmadı. Zəhmət olmasa kart məlumatlarını yoxlayın.");
-            }
-
-            notificationClient.sendEmail(notification);
-        } catch (Exception e) {
-            System.err.println("Ödəniş bildirişi göndərilmədi: " + e.getMessage());
+            sendPaymentNotification(savedPayment);
         }
 
         return savedPayment;
     }
+
+    @CircuitBreaker(name = "order-service", fallbackMethod = "orderStatusFallback")
+    public void updateOrderAfterPayment(Long id, String status) {
+        orderClient.updateOrderStatus(id, status, "ADMIN");
+    }
+
+    @CircuitBreaker(name = "notification-service", fallbackMethod = "notificationFallback")
+    public void sendPaymentNotification(Payment payment) {
+        NotificationRequest notification = new NotificationRequest();
+        notification.setTo(payment.getUserEmail());
+        notification.setSubject("Ödəniş #" + payment.getOrderId());
+        notification.setMessage("Hörmətli müştəri, ödənişiniz uğurla tamamlandı. Status: " + payment.getStatus());
+
+        notificationClient.sendEmail(notification);
+    }
+
+    public void orderStatusFallback(Long id, String status, Throwable t) {
+        System.err.println("Fallback: Order servisi əlçatmazdır. ID: " + id + ". Xəta: " + t.getMessage());
+    }
+
+    public void notificationFallback(Payment payment, Throwable t) {
+        System.err.println("Fallback: Bildiriş servisi əlçatmazdır. Mail: " + payment.getUserEmail() + ". Xəta: " + t.getMessage());
+    }
+
     public List<Payment> getAllPayments() {
         return paymentRepository.findAll();
     }
-    public Payment getPaymentByOrderId(Long orderId) {
-        return paymentRepository.findByOrderId(orderId);
-    }
-
 }
