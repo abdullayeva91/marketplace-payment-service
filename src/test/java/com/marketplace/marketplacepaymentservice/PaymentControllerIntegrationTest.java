@@ -1,6 +1,5 @@
 package com.marketplace.marketplacepaymentservice;
 
-import com.marketplace.marketplacepaymentservice.MarketplacePaymentServiceApplication;
 import com.marketplace.marketplacepaymentservice.controller.PaymentController;
 import com.marketplace.marketplacepaymentservice.dto.PaymentRequest;
 import com.marketplace.marketplacepaymentservice.enums.PaymentStatus;
@@ -8,7 +7,6 @@ import com.marketplace.marketplacepaymentservice.model.Payment;
 import com.marketplace.marketplacepaymentservice.service.PaymentService;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -45,7 +43,6 @@ public class PaymentControllerIntegrationTest {
 
     @Test
     void shouldProcessPaymentSuccessfully() throws Exception {
-        // Data hazırlığı
         PaymentRequest request = new PaymentRequest();
         request.setOrderId(1L);
         request.setAmount(new BigDecimal("99.99"));
@@ -54,10 +51,8 @@ public class PaymentControllerIntegrationTest {
         mockPayment.setId(100L);
         mockPayment.setStatus(PaymentStatus.valueOf("SUCCESS"));
 
-        // 4. İndi paymentService mütləq yaradılıb, null ola bilməz!
         when(paymentService.paymentProcesses(any(PaymentRequest.class))).thenReturn(mockPayment);
 
-        // İcra et
         mockMvc.perform(post("/api/payments/process")
                         .header("X-Auth-User-Id", "1")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -69,8 +64,8 @@ public class PaymentControllerIntegrationTest {
     @Test
     void shouldReturnForbidden_WhenNotAdmin() throws Exception {
         mockMvc.perform(get("/api/payments")
-                        .header("X-Auth-User-Role", "USER")) // USER rolu ilə giririk
-                .andExpect(status().isForbidden()); // 403 gözləyirik
+                        .header("X-Auth-User-Role", "USER"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -78,6 +73,6 @@ public class PaymentControllerIntegrationTest {
         mockMvc.perform(post("/api/payments/process")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isUnauthorized()); // 401 gözləyirik
+                .andExpect(status().isUnauthorized());
     }
 }
